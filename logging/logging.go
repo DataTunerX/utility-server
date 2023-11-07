@@ -24,7 +24,7 @@ type ZapLogger struct {
 	sugar  *zap.SugaredLogger
 }
 
-func NewZapLogger(logLevel string) *ZapLogger {
+func NewZapLogger(logLevel string) {
 	var zapConfig zap.Config
 	var level zapcore.Level
 	if err := level.UnmarshalText([]byte(logLevel)); err != nil {
@@ -48,7 +48,7 @@ func NewZapLogger(logLevel string) *ZapLogger {
 		panic(err)
 	}
 
-	return &ZapLogger{
+	ZLogger = &ZapLogger{
 		logger: logger,
 		sugar:  logger.Sugar(),
 	}
