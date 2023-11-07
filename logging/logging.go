@@ -31,16 +31,16 @@ func NewZapLogger(logLevel string) {
 		panic(err)
 	}
 
-	zapConfig.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	zapConfig.Level = zap.NewAtomicLevelAt(level)
-
 	switch level {
 	case zap.DebugLevel:
 		zapConfig = zap.NewDevelopmentConfig()
+		zapConfig.Level = zap.NewAtomicLevelAt(level)
 		zapConfig.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	default:
 		zapConfig = zap.NewProductionConfig()
+		zapConfig.Level = zap.NewAtomicLevelAt(level)
 		zapConfig.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+		zapConfig.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	}
 
 	logger, err := zapConfig.Build(zap.AddCaller(), zap.AddCallerSkip(1))
