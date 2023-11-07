@@ -1,4 +1,4 @@
-module utility-server
+module github.com/DataTunerX/utility-server
 
 go 1.20
 
