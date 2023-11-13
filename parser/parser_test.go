@@ -13,7 +13,7 @@ func TestReplaceTemplate(t *testing.T) {
 	}
 	expectedResult := "apiVersion: v1\nkind: Pod\nmetadata:\n  name: my-pod\nspec:\n  containers:\n  - name: my-container\n    image: nginx:latest"
 
-	result, err := replaceTemplate(yamlTemplate, data)
+	result, err := ReplaceTemplate(yamlTemplate, data)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -24,7 +24,7 @@ func TestReplaceTemplate(t *testing.T) {
 
 	// 测试用例2：模板错误
 	invalidYAML := "apiVersion: v1\nkind: Pod\nmetadata:\n  name: {{ .Name\nspec:\n  containers:\n  - name: my-container\n    image: {{ .Image }}"
-	_, err = replaceTemplate(invalidYAML, data)
+	_, err = ReplaceTemplate(invalidYAML, data)
 	if err == nil {
 		t.Error("Expected an error for invalid YAML template, but got none.")
 	}
