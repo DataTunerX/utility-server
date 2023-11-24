@@ -1,26 +1,26 @@
-# 使用 Go 镜像作为基础镜像
-FROM golang:1.17 as builder
+# Using Go image as the builder stage
+FROM golang:1.21 as builder
 
-# 设置工作目录
+# Set the working directory
 WORKDIR /app
 
-# 复制项目文件到工作目录
+# Copy project files to the working directory
 COPY . .
 
-# 构建可执行文件
+# Build the executable
 RUN go build -o patch-k8s-server
 
-# 创建最终的镜像，使用轻量的 alpine 镜像
-FROM alpine:latest
+# Create the final image using a lightweight Alpine image
+FROM alpine:3.14
 
-# 设置工作目录
+# Set the working directory
 WORKDIR /app
 
-# 从构建镜像中拷贝可执行文件
+# Copy the executable from the builder stage
 COPY --from=builder /app/patch-k8s-server .
 
-# 暴露应用程序端口
+# Expose the application port
 EXPOSE 8080
 
-# 启动应用程序
+# Start the application
 CMD ["./patch-k8s-server"]
