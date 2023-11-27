@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -44,7 +46,7 @@ func main() {
 	// Start HTTP server
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "9090"
+		port = "9111"
 	}
 	router.Run(":" + port)
 }
@@ -61,16 +63,14 @@ func initKubeClient() KubernetesClients {
 		if err != nil {
 			panic(err.Error())
 		}
+		fmt.Println("Using in-cluster config")
 	} else {
 		// If running locally, use the provided kubeconfig file
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
 			panic(err.Error())
 		}
-	}
-
-	if err != nil {
-		panic(err.Error())
+		fmt.Printf("Using kubeconfig file: %s\n", kubeconfig)
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
@@ -95,6 +95,8 @@ func updateResourceHandler(c *gin.Context) {
 	resourceKind := c.Param("resourceKind")
 	resourceName := c.Param("resourceName")
 
+	fmt.Printf("Received request: namespace=%s, resourceKind=%s, resourceName=%s\n", namespace, resourceKind, resourceName)
+
 	// Get dynamic client
 	dynamicClient := kubeClients.DynamicClient
 
@@ -105,12 +107,16 @@ func updateResourceHandler(c *gin.Context) {
 		return
 	}
 
+	fmt.Printf("Mapped resourceKind %s to resource %s\n", resourceKind, resource)
+
 	// Get data from the request
 	var requestBody map[string]interface{}
 	if err := c.ShouldBindJSON(&requestBody); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	fmt.Printf("Received JSON data: %v\n", requestBody)
 
 	// Get GroupVersionResource for the corresponding resource object
 	resourceGroupVersion := schema.GroupVersionResource{
@@ -126,17 +132,24 @@ func updateResourceHandler(c *gin.Context) {
 		return
 	}
 
+	fmt.Printf("Retrieved existing resource object: %+v\n", resourceObject)
+
+	// Convert requestBody to []byte
+	requestBodyBytes, err := json.Marshal(requestBody)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to marshal JSON: %v", err)})
+		return
+	}
 	// Update the resource object's spec and status with retry mechanism
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		// Use DeepCopy to prevent modification of the original object during retry
-		objCopy := resourceObject.DeepCopy()
 
-		// Map data from the request body to the DeepCopy of the resource object
-		if err := c.ShouldBindJSON(&objCopy.Object); err != nil {
-			return err
-		}
-
-		_, updateErr := dynamicClient.Resource(resourceGroupVersion).Namespace(namespace).Update(context.TODO(), objCopy, metav1.UpdateOptions{})
+		_, updateErr := dynamicClient.Resource(resourceGroupVersion).Namespace(namespace).Patch(context.TODO(),
+			resourceName,
+			types.MergePatchType,
+			requestBodyBytes,
+			metav1.PatchOptions{},
+		)
+		fmt.Printf("Error updating resource object: %v", updateErr)
 		return updateErr
 	})
 
