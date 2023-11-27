@@ -46,7 +46,7 @@ func main() {
 	// Start HTTP server
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "9111"
+		port = "8080"
 	}
 	router.Run(":" + port)
 }
