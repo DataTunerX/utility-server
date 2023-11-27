@@ -1,5 +1,5 @@
 # Using Go image as the builder stage
-FROM golang:1.21 as builder
+FROM golang:1.19 as builder
 
 # Set the working directory
 WORKDIR /app
@@ -11,13 +11,15 @@ COPY . .
 RUN go build -o patch-k8s-server
 
 # Create the final image using a lightweight Alpine image
-FROM alpine:3.14
+FROM amd64/alpine:3.15
 
 # Set the working directory
 WORKDIR /app
 
 # Copy the executable from the builder stage
 COPY --from=builder /app/patch-k8s-server .
+
+RUN chmod +x patch-k8s-server
 
 # Expose the application port
 EXPOSE 8080
