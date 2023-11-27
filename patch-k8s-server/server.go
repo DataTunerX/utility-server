@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
 )
@@ -43,7 +44,7 @@ func main() {
 	// Start HTTP server
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "9090"
 	}
 	router.Run(":" + port)
 }
@@ -51,7 +52,23 @@ func main() {
 // Initialize Kubernetes clients
 func initKubeClient() KubernetesClients {
 	kubeconfig := os.Getenv("KUBECONFIG")
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	var config *rest.Config
+	var err error
+
+	// If running inside a Kubernetes cluster, use in-cluster config
+	if kubeconfig == "" {
+		config, err = rest.InClusterConfig()
+		if err != nil {
+			panic(err.Error())
+		}
+	} else {
+		// If running locally, use the provided kubeconfig file
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			panic(err.Error())
+		}
+	}
+
 	if err != nil {
 		panic(err.Error())
 	}
