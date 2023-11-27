@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bytes"
+	"regexp"
 	"text/template"
 )
 
@@ -17,5 +18,9 @@ func ReplaceTemplate(yamlContent string, data map[string]interface{}) (string, e
 		return "", err
 	}
 
-	return replacedYAML.String(), nil
+	// 使用正则表达式替换模板变量为 ""
+	re := regexp.MustCompile(`{{\s*\..*?\s*}}`)
+	replacedStr := re.ReplaceAllString(replacedYAML.String(), "")
+
+	return replacedStr, nil
 }
