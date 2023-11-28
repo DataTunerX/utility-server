@@ -134,6 +134,9 @@ func updateResourceHandler(c *gin.Context) {
 
 	fmt.Printf("Retrieved existing resource object: %+v\n", resourceObject)
 
+	// Check if the status field is present in the request body
+	newStatus, statusFieldPresent := requestBody["status"]
+
 	// Convert requestBody to []byte
 	requestBodyBytes, err := json.Marshal(requestBody)
 	if err != nil {
@@ -149,6 +152,14 @@ func updateResourceHandler(c *gin.Context) {
 			requestBodyBytes,
 			metav1.PatchOptions{},
 		)
+		if statusFieldPresent {
+			resourceObject.Object["status"] = newStatus
+			_, updateErr = dynamicClient.Resource(resourceGroupVersion).Namespace(namespace).UpdateStatus(context.TODO(),
+				resourceObject,
+				metav1.UpdateOptions{},
+			)
+		}
+
 		fmt.Printf("Error updating resource object: %v", updateErr)
 		return updateErr
 	})
