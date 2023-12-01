@@ -103,6 +103,6 @@ go.work.sum
 
 # Python workspace file
 .env/
-
+__pycache__
 # VSCode
 .vscode/
