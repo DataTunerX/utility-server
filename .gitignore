@@ -101,3 +101,8 @@ fabric.properties
 go.work
 go.work.sum
 
+# Python workspace file
+.env/
+
+# VSCode
+.vscode/

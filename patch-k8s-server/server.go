@@ -94,6 +94,7 @@ func updateResourceHandler(c *gin.Context) {
 	namespace := c.Param("namespace")
 	resourceKind := c.Param("resourceKind")
 	resourceName := c.Param("resourceName")
+	objName := c.Param("objName")
 
 	fmt.Printf("Received request: namespace=%s, resourceKind=%s, resourceName=%s\n", namespace, resourceKind, resourceName)
 
@@ -110,7 +111,7 @@ func updateResourceHandler(c *gin.Context) {
 	fmt.Printf("Mapped resourceKind %s to resource %s\n", resourceKind, resource)
 
 	// Get data from the request
-	var requestBody map[string]interface{}
+	var requestBody interface{}
 	if err := c.ShouldBindJSON(&requestBody); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -134,34 +135,36 @@ func updateResourceHandler(c *gin.Context) {
 
 	fmt.Printf("Retrieved existing resource object: %+v\n", resourceObject)
 
-	// Check if the status field is present in the request body
-	newStatus, statusFieldPresent := requestBody["status"]
-
-	// Convert requestBody to []byte
-	requestBodyBytes, err := json.Marshal(requestBody)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to marshal JSON: %v", err)})
-		return
-	}
 	// Update the resource object's spec and status with retry mechanism
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 
-		_, updateErr := dynamicClient.Resource(resourceGroupVersion).Namespace(namespace).Patch(context.TODO(),
-			resourceName,
-			types.MergePatchType,
-			requestBodyBytes,
-			metav1.PatchOptions{},
-		)
-		if statusFieldPresent {
-			resourceObject.Object["status"] = newStatus
-			_, updateErr = dynamicClient.Resource(resourceGroupVersion).Namespace(namespace).UpdateStatus(context.TODO(),
+		// Check if the request body is an array
+		if subsets, isArray := requestBody.([]interface{}); isArray {
+			// If it's an array, transform the request body
+			requestBody = map[string]interface{}{"spec": map[string]interface{}{"datasetMetadata": map[string]interface{}{"datasetInfo": map[string]interface{}{"subsets": subsets}}}}
+			// Convert requestBody to []byte
+			requestBodyBytes, err := json.Marshal(requestBody)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to marshal JSON: %v", err)})
+				return err
+			}
+			_, updateErr := dynamicClient.Resource(resourceGroupVersion).Namespace(namespace).Patch(context.TODO(),
+				resourceName,
+				types.MergePatchType,
+				requestBodyBytes,
+				metav1.PatchOptions{},
+			)
+			return updateErr
+		} else {
+			// If it's a map, transform the request body and use UpdateStatus
+			requestBody = map[string]interface{}{"status": requestBody}
+			resourceObject.Object["status"] = requestBody
+			_, updateErr := dynamicClient.Resource(resourceGroupVersion).Namespace(namespace).UpdateStatus(context.TODO(),
 				resourceObject,
 				metav1.UpdateOptions{},
 			)
+			return updateErr
 		}
-
-		fmt.Printf("Error updating resource object: %v", updateErr)
-		return updateErr
 	})
 
 	if err != nil {
@@ -169,6 +172,12 @@ func updateResourceHandler(c *gin.Context) {
 		return
 	}
 
+	// Delete the specified object
+	err = dynamicClient.Resource(resourceGroupVersion).Namespace(namespace).Delete(context.TODO(), objName, metav1.DeleteOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to delete %s object: %v", objName, err)})
+		return
+	}
 	// Return a success response
 	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%s %s/%s updated successfully", resource, namespace, resourceName)})
 }
