@@ -41,7 +41,7 @@ func main() {
 	router := gin.Default()
 
 	// Set up routes
-	router.POST("/apis/util.datatunerx.io/v1beta1/namespaces/:namespace/:resourceKind/:resourceName", updateResourceHandler)
+	router.POST("/apis/util.datatunerx.io/v1beta1/namespaces/:namespace/:resourceKind/:resourceName/:objName", updateResourceHandler)
 
 	// Start HTTP server
 	port := os.Getenv("PORT")
