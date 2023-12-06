@@ -144,9 +144,9 @@ func updateResourceHandler(c *gin.Context) {
 		// Check if the request body is an array
 		if subsets, isArray := requestBody.([]interface{}); isArray {
 			// If it's an array, transform the request body
-			requestBody = map[string]interface{}{"spec": map[string]interface{}{"datasetMetadata": map[string]interface{}{"datasetInfo": map[string]interface{}{"subsets": subsets}}}}
+			tmpRequestBody := map[string]interface{}{"spec": map[string]interface{}{"datasetMetadata": map[string]interface{}{"datasetInfo": map[string]interface{}{"subsets": subsets}}}}
 			// Convert requestBody to []byte
-			requestBodyBytes, err := json.Marshal(requestBody)
+			requestBodyBytes, err := json.Marshal(tmpRequestBody)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to marshal JSON: %v", err)})
 				return err
@@ -160,8 +160,8 @@ func updateResourceHandler(c *gin.Context) {
 			return updateErr
 		} else {
 			// If it's a map, transform the request body and use UpdateStatus
-			requestBody = map[string]interface{}{"status": requestBody}
-			resourceObject.Object["status"] = requestBody
+			tmpRequestBody := map[string]interface{}{"status": requestBody}
+			resourceObject.Object["status"] = tmpRequestBody
 			_, updateErr := dynamicClient.Resource(resourceGroupVersion).Namespace(namespace).UpdateStatus(context.TODO(),
 				resourceObject,
 				metav1.UpdateOptions{},
