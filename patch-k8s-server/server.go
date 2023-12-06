@@ -160,8 +160,8 @@ func updateResourceHandler(c *gin.Context) {
 			return updateErr
 		} else {
 			// If it's a map, transform the request body and use UpdateStatus
-			tmpRequestBody := map[string]interface{}{"status": requestBody}
-			resourceObject.Object["status"] = tmpRequestBody
+			// tmpRequestBody := map[string]interface{}{"status": requestBody}
+			resourceObject.Object["status"] = requestBody
 			_, updateErr := dynamicClient.Resource(resourceGroupVersion).Namespace(namespace).UpdateStatus(context.TODO(),
 				resourceObject,
 				metav1.UpdateOptions{},
