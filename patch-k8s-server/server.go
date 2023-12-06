@@ -41,7 +41,7 @@ func main() {
 	router := gin.Default()
 
 	// Set up routes
-	router.POST("/apis/util.datatunerx.io/v1beta1/namespaces/:namespace/:resourceKind/:resourceName/:objName", updateResourceHandler)
+	router.POST("/apis/util.datatunerx.io/v1beta1/namespaces/:namespace/:resourceKind/:resourceName/:group/:version/:kind/:objName", updateResourceHandler)
 
 	// Start HTTP server
 	port := os.Getenv("PORT")
@@ -94,6 +94,9 @@ func updateResourceHandler(c *gin.Context) {
 	namespace := c.Param("namespace")
 	resourceKind := c.Param("resourceKind")
 	resourceName := c.Param("resourceName")
+	group := c.Param("group")
+	version := c.Param("version")
+	kind := c.Param("kind")
 	objName := c.Param("objName")
 
 	fmt.Printf("Received request: namespace=%s, resourceKind=%s, resourceName=%s\n", namespace, resourceKind, resourceName)
@@ -172,8 +175,13 @@ func updateResourceHandler(c *gin.Context) {
 		return
 	}
 
+	toDeleteResourceGroupVersion := schema.GroupVersionResource{
+		Group:    group,
+		Version:  version,
+		Resource: kind,
+	}
 	// Delete the specified object
-	err = dynamicClient.Resource(resourceGroupVersion).Namespace(namespace).Delete(context.TODO(), objName, metav1.DeleteOptions{})
+	err = dynamicClient.Resource(toDeleteResourceGroupVersion).Namespace(namespace).Delete(context.TODO(), objName, metav1.DeleteOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to delete %s object: %v", objName, err)})
 		return
