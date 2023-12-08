@@ -20,7 +20,7 @@ if evaluation_language == "all":
     )
 else:
     samples = (
-        questions_references_en_list[:20]
+        questions_references_en_list
         if evaluation_language == "en"
         else questions_references_zh_list
     )
@@ -62,10 +62,10 @@ for index, q in enumerate(questions, start=1):
 
 references = [sample['references'] for sample in samples]
 
-rouge = evaluate.load("rouge")
+rouge = evaluate.load(".module/rouge")
 rouge_result = rouge.compute(predictions=predictions, references=references)
 
-bleu = evaluate.load("bleu")
+bleu = evaluate.load(".module/bleu")
 bleu_result = bleu.compute(predictions=predictions, references=references)
 
 
