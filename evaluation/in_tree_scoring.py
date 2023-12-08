@@ -84,9 +84,11 @@ bleu_score = bleu_result['bleu']*100
 rouge_weight = 0.75
 bleu_weight = 0.25
 
-score = (rouge_weight*rouge_score + bleu_weight*bleu_score)
+score = round((rouge_weight*rouge_score + bleu_weight*bleu_score), 2)
 
+rouge_result_str = {key: str(value) for key, value in rouge_result.items()}
+bleu_result_str = {key: str(value) for key, value in bleu_result.items()}
 
-data = {"score": score, "metrics": ["ROUGE", "BLEU"], "details": {**rouge_result, **bleu_result}}
+data = {"score": str(score), "metrics": ["ROUGE", "BLEU"], "details": {**rouge_result_str, **bleu_result_str}}
 result = requests.post(complete_notify_url, data=json.dumps(data), headers={"content-type": "application/json"})
 print(result.content)
