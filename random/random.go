@@ -6,7 +6,7 @@ import (
 	"unsafe"
 )
 
-const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
 
 var randomSource = rand.NewSource(time.Now().UnixNano())
 
