@@ -3,7 +3,6 @@ import os
 from transformers import LlamaForCausalLM, LlamaTokenizer, GenerationConfig, pipeline
 from peft import PeftModel
 from ray import serve
-import asyncio
 
 # origin_model_dir = "/data/llms/llama2-7b"
 # checkpoint_dir = "/ray_results/TorchTrainer_73434_00000_0_2023-11-22_23-26-10/result"
@@ -68,8 +67,6 @@ class LlamaDeployment:
     async def __call__(self, request):
         body = await request.json()
         input_data = body.get("input")
-        task = asyncio.create_task(self.model.generate(input_data))
-        result = await task
-        return result
+        return self.model.generate(input_data)
     
 deployment = LlamaDeployment.bind()
