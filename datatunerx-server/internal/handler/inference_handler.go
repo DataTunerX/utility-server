@@ -1,23 +1,77 @@
+// internal/handler/inference_handler.go
+
 package handler
 
 import (
+	"bytes"
+	"datatunerx-server/config"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+
+	"github.com/DataTunerX/utility-server/logging"
 	"github.com/gin-gonic/gin"
 )
 
-// ValidateServicesQueryParam 是中间件函数，用于验证 services 查询参数
-func ValidateServicesQueryParam(c *gin.Context) {
-	services := c.QueryArray("services")
-
-	// 检查 services 是否是非空数组
-	if len(services) == 0 {
-		c.JSON(400, gin.H{"error": "Query parameter 'services' is required and must be a non-empty array"})
-		c.Abort()
+// InferenceHandler 是处理 /inference 的路由处理函数
+func InferenceHandler(c *gin.Context) {
+	logging.NewZapLogger(config.GetLevel())
+	// 解析请求体
+	var requestBody map[string]interface{}
+	if err := c.ShouldBindJSON(&requestBody); err != nil {
+		c.JSON(400, gin.H{"error": fmt.Sprintf("Failed to parse request body: %v", err)})
 		return
 	}
 
-	// 在上下文中设置验证后的参数，以便后续的处理函数使用
-	c.Set("services", services)
+	// 获取 model 字段值
+	model, ok := requestBody["model"].(string)
+	if !ok {
+		c.JSON(400, gin.H{"error": "Missing or invalid 'model' field in the request body"})
+		return
+	}
 
-	// 继续执行后续处理函数
-	c.Next()
+	// 解析 model 字段值，形式为 "servicename.namespace"
+	modelParts := parseModelField(model)
+	if modelParts == nil {
+		c.JSON(400, gin.H{"error": "Invalid 'model' field format"})
+		return
+	}
+
+	// 构建目标服务地址
+	targetServiceURL := fmt.Sprintf("http://%s.svc.cluster.local/chat/completions", model)
+
+	// 发起转发请求
+	resp, err := forwardRequest(targetServiceURL, requestBody)
+	if err != nil {
+		c.JSON(500, gin.H{"error": fmt.Sprintf("Failed to forward request: %v", err)})
+		return
+	}
+
+	// 返回目标服务的响应
+	c.JSON(resp.StatusCode, resp.Body)
+}
+
+// parseModelField 解析 model 字段值，返回服务名和命名空间
+func parseModelField(model string) []string {
+	return strings.Split(model, ".")
+}
+
+// forwardRequest 发起转发请求
+func forwardRequest(targetURL string, requestBody map[string]interface{}) (*http.Response, error) {
+	// 将请求体转换为 JSON 字符串
+	requestBodyBytes, err := json.Marshal(requestBody)
+	if err != nil {
+		logging.ZLogger.Errorf("Failed to marshal JSON request body: %v", err)
+		return nil, err
+	}
+
+	// 发起 POST 请求
+	resp, err := http.Post(targetURL, "application/json", bytes.NewBuffer(requestBodyBytes))
+	if err != nil {
+		logging.ZLogger.Errorf("Failed to forward request: %v", err)
+		return nil, err
+	}
+
+	return resp, nil
 }

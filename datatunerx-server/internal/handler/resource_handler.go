@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"datatunerx-server/config"
 	"datatunerx-server/pkg/k8s"
 
 	"github.com/gin-gonic/gin"
@@ -133,4 +134,34 @@ func (rh *ResourceHandler) UpdateResourceHandler(c *gin.Context) {
 	}
 	// Return a success response
 	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%s %s/%s updated successfully", resource, namespace, resourceName)})
+}
+
+// ListRayServices lists rayservices objects in the specified namespace with the given label selector
+func (rh *ResourceHandler) ListRayServices(c *gin.Context) {
+	namespace := c.Param("namespace")
+
+	// Get dynamic client
+	dynamicClient := rh.KubeClients.DynamicClient
+
+	// Specify the label selector
+	labelSelector := config.GetInferenceServiceLabel()
+
+	// Get GroupVersionResource for the rayservices resource object
+	rayServicesGroupVersion := schema.GroupVersionResource{
+		Group:    config.GetRayServiceGroup(),
+		Version:  config.GetRayServiceVersion(),
+		Resource: config.GetRayServiceResource(),
+	}
+
+	// List rayservices objects with the label selector
+	rayServicesList, err := dynamicClient.Resource(rayServicesGroupVersion).Namespace(namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to list rayservices: %v", err)})
+		return
+	}
+
+	// Return the list of rayservices objects
+	c.JSON(http.StatusOK, rayServicesList)
 }
