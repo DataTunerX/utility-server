@@ -16,8 +16,25 @@ func main() {
 	// Initialize Gin Engine
 	router := gin.Default()
 
-	// Set up routes
-	router.POST("/apis/util.datatunerx.io/v1beta1/namespaces/:namespace/:resourceKind/:resourceName/:group/:version/:kind/:objName", handler.NewResourceHandler(kubeClients).UpdateResourceHandler)
+	apiGroup := router.Group("/apis/util.datatunerx.io/v1beta1")
+
+	namespaceGroup := apiGroup.Group("/namespaces/:namespace")
+	// plugin webhook routes
+	resourceUpdate := namespaceGroup.Group("/:resourceKind/:resourceName")
+	{
+		resourceUpdate.POST("/:group/:version/:kind/:objName", handler.NewResourceHandler(kubeClients).UpdateResourceHandler)
+	}
+	// inference service routes
+	inferenceService := namespaceGroup.Group("/services")
+	{
+		inferenceService.GET("", handler.NewResourceHandler(kubeClients).ListRayServices)
+	}
+
+	// inference proxy routes
+	inferenceProxy := apiGroup.Group("/inference")
+	{
+		inferenceProxy.POST("/chat", handler.InferenceHandler)
+	}
 
 	// Start HTTP server
 	port := os.Getenv("PORT")
