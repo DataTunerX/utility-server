@@ -79,26 +79,54 @@ func (Ih *InferenceHandler) InferenceChatHandler(c *gin.Context) {
 	}
 
 	// 返回目标服务的响应
-	c.JSON(resp.StatusCode, resp.Body)
+	c.JSON(200, gin.H{
+		"output":      resp.Output,
+		"tokenLength": resp.TokenLength,
+		"elaspedTime": resp.ElapsedTime,
+		"tokenPerSec": resp.TokenPerSec,
+	})
 }
 
 // forwardRequest 发起转发请求
-func forwardRequest(targetURL string, requestBody InferenceBody) (*http.Response, error) {
+func forwardRequest(targetURL string, requestBody InferenceBody) (InferenceProcessedResponse, error) {
 	// 将请求体转换为 JSON 字符串
 	requestBodyBytes, err := json.Marshal(requestBody)
 	if err != nil {
 		logging.ZLogger.Errorf("Failed to marshal JSON request body: %v", err)
-		return nil, err
+		return InferenceProcessedResponse{}, err
 	}
 
 	// 发起 POST 请求
 	resp, err := http.Post(targetURL, "application/json", bytes.NewBuffer(requestBodyBytes))
 	if err != nil {
 		logging.ZLogger.Errorf("Failed to forward request: %v", err)
-		return nil, err
+		return InferenceProcessedResponse{}, err
+	}
+	defer resp.Body.Close()
+
+	// 解析响应体
+	var response InferenceResponse
+	decoder := json.NewDecoder(resp.Body)
+	if err := decoder.Decode(&response); err != nil {
+		logging.ZLogger.Errorf("Failed to decode JSON response: %v", err)
+		return InferenceProcessedResponse{}, err
 	}
 
-	return resp, nil
+	// 处理响应数据
+	output := response.Choices[0].Message.Content
+	tokenLength := response.Usage.TotalTokens
+	elapsedTIme := response.Usage.ElapsedTIme
+	tokenPerSec := response.Usage.TokenPerSec
+
+	// 构造处理后的响应数据
+	processedResponse := InferenceProcessedResponse{
+		Output:      output,
+		TokenLength: tokenLength,
+		ElapsedTime: elapsedTIme,
+		TokenPerSec: tokenPerSec,
+	}
+
+	return processedResponse, nil
 }
 
 type InferenceBody struct {
@@ -109,4 +137,35 @@ type InferenceBody struct {
 type InferenceBodyMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+}
+
+type InferenceUsage struct {
+	PromptTokens     int    `json:"prompt_tokens"`
+	CompletionTokens int    `json:"completion_tokens"`
+	TotalTokens      int    `json:"total_tokens"`
+	ElapsedTIme      int    `json:"elasped_time"`
+	TokenPerSec      string `json:"token_per_sec"`
+}
+
+type InferenceChoice struct {
+	Index        int                  `json:"index"`
+	Message      InferenceBodyMessage `json:"message"`
+	FinishReason string               `json:"finish_reason"`
+}
+
+type InferenceResponse struct {
+	ID                string            `json:"id"`
+	Object            string            `json:"object"`
+	Created           int64             `json:"created"`
+	Model             string            `json:"model"`
+	SystemFingerprint string            `json:"system_fingerprint"`
+	Choices           []InferenceChoice `json:"choices"`
+	Usage             InferenceUsage    `json:"usage"`
+}
+
+type InferenceProcessedResponse struct {
+	Output      string `json:"output"`
+	TokenLength int    `json:"tokenLength"`
+	ElapsedTime int    `json:"elapsedTime"`
+	TokenPerSec string `json:"tokenPerSec"`
 }
