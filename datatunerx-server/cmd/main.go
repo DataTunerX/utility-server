@@ -3,8 +3,9 @@ package main
 import (
 	"os"
 
-	"datatunerx-server/internal/handler"
 	"datatunerx-server/pkg/k8s"
+
+	"datatunerx-server/internal/handler"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,8 +18,8 @@ func main() {
 	router := gin.Default()
 
 	apiGroup := router.Group("/apis/util.datatunerx.io/v1beta1")
-
 	namespaceGroup := apiGroup.Group("/namespaces/:namespace")
+
 	// plugin webhook routes
 	resourceUpdate := namespaceGroup.Group("/:resourceKind/:resourceName")
 	{
@@ -28,12 +29,12 @@ func main() {
 	inferenceService := namespaceGroup.Group("/services")
 	{
 		inferenceService.GET("", handler.NewResourceHandler(kubeClients).ListRayServices)
+		inferenceService.POST("")
 	}
-
 	// inference proxy routes
-	inferenceProxy := apiGroup.Group("/inference")
+	inferenceProxy := namespaceGroup.Group("/services/:serviceName/inference")
 	{
-		inferenceProxy.POST("/chat", handler.InferenceHandler)
+		inferenceProxy.POST("/chat", handler.NewInferenceHandler(kubeClients).InferenceChatHandler)
 	}
 
 	// finetune metrics routes
