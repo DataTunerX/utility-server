@@ -8,6 +8,7 @@ import (
 
 	"datatunerx-server/config"
 	"datatunerx-server/pkg/k8s"
+	"datatunerx-server/pkg/ray"
 
 	"github.com/gin-gonic/gin"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,12 +20,14 @@ import (
 // ResourceHandler struct contains necessary dependencies
 type ResourceHandler struct {
 	KubeClients k8s.KubernetesClients
+	RayClients  ray.RayClient
 }
 
 // NewResourceHandler creates a new instance of ResourceHandler
-func NewResourceHandler(kubeClients k8s.KubernetesClients) *ResourceHandler {
+func NewResourceHandler(kubeClients k8s.KubernetesClients, rayClients ray.RayClient) *ResourceHandler {
 	return &ResourceHandler{
 		KubeClients: kubeClients,
+		RayClients:  rayClients,
 	}
 }
 
@@ -139,22 +142,9 @@ func (rh *ResourceHandler) UpdateResourceHandler(c *gin.Context) {
 // ListRayServices lists rayservices objects in the specified namespace with the given label selector
 func (rh *ResourceHandler) ListRayServices(c *gin.Context) {
 	namespace := c.Param("namespace")
-
-	// Get dynamic client
-	dynamicClient := rh.KubeClients.DynamicClient
-
 	// Specify the label selector
 	labelSelector := config.GetInferenceServiceLabel()
-
-	// Get GroupVersionResource for the rayservices resource object
-	rayServicesGroupVersion := schema.GroupVersionResource{
-		Group:    config.GetRayServiceGroup(),
-		Version:  config.GetRayServiceVersion(),
-		Resource: config.GetRayServiceResource(),
-	}
-
-	// List rayservices objects with the label selector
-	rayServicesList, err := dynamicClient.Resource(rayServicesGroupVersion).Namespace(namespace).List(context.TODO(), metav1.ListOptions{
+	rayServicesList, err := rh.RayClients.Clientset.RayV1().RayServices(namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
