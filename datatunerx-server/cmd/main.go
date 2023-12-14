@@ -30,12 +30,12 @@ func main() {
 	// plugin webhook routes
 	resourceUpdate := namespaceGroup.Group("/:resourceKind/:resourceName")
 	{
-		resourceUpdate.POST("/:group/:version/:kind/:objName", handler.NewResourceHandler(kubeClients).UpdateResourceHandler)
+		resourceUpdate.POST("/:group/:version/:kind/:objName", handler.NewResourceHandler(kubeClients, rayClients).UpdateResourceHandler)
 	}
 	// inference service routes
 	inferenceService := namespaceGroup.Group("/services")
 	{
-		inferenceService.GET("", handler.NewResourceHandler(kubeClients).ListRayServices)
+		inferenceService.GET("", handler.NewResourceHandler(kubeClients, rayClients).ListRayServices)
 		inferenceService.POST("")
 	}
 	// inference proxy routes
