@@ -3,17 +3,24 @@ package main
 import (
 	"os"
 
-	"datatunerx-server/pkg/k8s"
-
+	"datatunerx-server/config"
 	"datatunerx-server/internal/handler"
+	"datatunerx-server/pkg/k8s"
+	"datatunerx-server/pkg/ray"
 
+	"github.com/DataTunerX/utility-server/logging"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	logging.NewZapLogger(config.GetLevel())
 	// Initialize Kubernetes clients
 	kubeClients := k8s.InitKubeClient()
-
+	// Initialize Ray clients
+	rayClients, err := ray.InitRayClient()
+	if err != nil {
+		logging.ZLogger.Errorf("Error initializing ray client: %v", err)
+	}
 	// Initialize Gin Engine
 	router := gin.Default()
 
@@ -34,7 +41,7 @@ func main() {
 	// inference proxy routes
 	inferenceProxy := namespaceGroup.Group("/services/:serviceName/inference")
 	{
-		inferenceProxy.POST("/chat", handler.NewInferenceHandler(kubeClients).InferenceChatHandler)
+		inferenceProxy.POST("/chat", handler.NewInferenceHandler(kubeClients, rayClients).InferenceChatHandler)
 	}
 
 	// finetune metrics routes
