@@ -5,19 +5,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"datatunerx-server/config"
 	"datatunerx-server/pkg/k8s"
 	"datatunerx-server/pkg/ray"
 
 	corev1beta1 "github.com/DataTunerX/meta-server/api/core/v1beta1"
-	// rayv1 "github.com/ray-project/kuberay/ray-operator/apis/ray/v1"
+	rayv1 "github.com/ray-project/kuberay/ray-operator/apis/ray/v1"
+
 	"github.com/DataTunerX/utility-server/logging"
 	"github.com/gin-gonic/gin"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -160,80 +165,217 @@ func (rh *ResourceHandler) ListRayServicesHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, rayServicesList)
 }
 
-// // CreateRayServiceHandler 创建 Rayservice 对象的路由处理函数
-// func (rh *ResourceHandler) CreateRayServiceHandler(c *gin.Context) {
-// 	namespace := c.Param("namespace")
+// CreateRayServiceHandler 创建 Rayservice 对象的路由处理函数
+func (rh *ResourceHandler) CreateRayServiceHandler(c *gin.Context) {
+	namespace := c.Param("namespace")
 
-// 	// 从请求体中获取创建 Rayservice 所需的数据
-// 	var requestBody map[string]interface{}
-// 	if err := c.ShouldBindJSON(&requestBody); err != nil {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Failed to parse request body: %v", err)})
-// 		return
-// 	}
+	// 从请求体中获取创建 Rayservice 所需的数据
+	var requestBody map[string]interface{}
+	if err := c.ShouldBindJSON(&requestBody); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Failed to parse request body: %v", err)})
+		return
+	}
 
-// 	var
-// 	llmCheckpoint, err := rh.GetLlmCheckpoint(requestBody["llmCheckpoint"].(string))
-// 	if llmCheckpoint.Spec.CheckpointImage != nil {
-// 		if llmCheckpoint.Spec.CheckpointImage.Name != nil {
-// 			image := llmCheckpoint.Spec.CheckpointImage.Name
-// 		} else {
-// 			logging.ZLogger.Error("LlmCheckpoint missing CheckpointImage.Name")
-// 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprint("LlmCheckpoint missing CheckpointImage.Name")})
-// 			return
-// 		}
-// 		if llmCheckpoint.Spec.CheckpointImage.LLMPath != "" {
-// 			llmPath := llmCheckpoint.Spec.CheckpointImage.LLMPath
-// 		} else {
-// 			logging.ZLogger.Error("LlmCheckpoint missing CheckpointImage.LLMPath")
-// 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprint("LlmCheckpoint missing CheckpointImage.LLMPath")})
-// 			return
-// 		}
-// 		if llmCheckpoint.Spec.CheckpointImage.CheckPointPath != "" {
-// 			checkpointPath := llmCheckpoint.Spec.CheckpointImage.CheckPointPath
-// 		} else {
-// 			logging.ZLogger.Error("LlmCheckpoint missing CheckpointImage.CheckPointPath")
-// 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprint("LlmCheckpoint missing CheckpointImage.CheckPointPath")})
-// 			return
-// 		}
-// 	} else {
-// 		logging.ZLogger.Error("LlmCheckpoint missing CheckpointImage")
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprint("LlmCheckpoint missing CheckpointImage")})
-// 		return
-// 	}
+	var image, llmPath, checkpointPath string
+	llmCheckpoint, err := rh.GetLlmCheckpoint(requestBody["llmCheckpoint"].(string))
+	if err != nil {
+		logging.ZLogger.Errorf("Failed to get LlmCheckpoint: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get LlmCheckpoint: %v", err)})
+	}
+	if llmCheckpoint.Spec.CheckpointImage != nil {
+		if llmCheckpoint.Spec.CheckpointImage.Name != nil {
+			image = *llmCheckpoint.Spec.CheckpointImage.Name
+		} else {
+			logging.ZLogger.Error("LlmCheckpoint missing CheckpointImage.Name")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "LlmCheckpoint missing CheckpointImage.Name"})
+			return
+		}
+		if llmCheckpoint.Spec.CheckpointImage.LLMPath != "" {
+			llmPath = llmCheckpoint.Spec.CheckpointImage.LLMPath
+		} else {
+			logging.ZLogger.Error("LlmCheckpoint missing CheckpointImage.LLMPath")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "LlmCheckpoint missing CheckpointImage.LLMPath"})
+			return
+		}
+		if llmCheckpoint.Spec.CheckpointImage.CheckPointPath != "" {
+			checkpointPath = llmCheckpoint.Spec.CheckpointImage.CheckPointPath
+		} else {
+			logging.ZLogger.Error("LlmCheckpoint missing CheckpointImage.CheckPointPath")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "LlmCheckpoint missing CheckpointImage.CheckPointPath"})
+			return
+		}
+	} else {
+		logging.ZLogger.Error("LlmCheckpoint missing CheckpointImage")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "LlmCheckpoint missing CheckpointImage"})
+		return
+	}
+	requestBody["image"] = image
+	requestBody["llmPath"] = llmPath
+	requestBody["checkpointPath"] = checkpointPath
+	// 创建 Rayservice 对象
+	rayService := rh.buildRayServiceObject(namespace, requestBody)
 
-// 	_ := image + l
-// 	// // 创建 Rayservice 对象
-// 	// rayService := rh.buildRayServiceObject(namespace, requestBody)
+	// 使用 Rayservice 的 Client 进行创建
+	createdRayService, err := rh.RayClients.Clientset.RayV1().RayServices(namespace).Create(context.TODO(), rayService, metav1.CreateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create rayservice: %v", err)})
+		return
+	}
 
-// 	// 使用 Rayservice 的 Client 进行创建
-// 	// createdRayService, err := rh.RayClients.Clientset.RayV1().RayServices(namespace).Create(context.TODO(), rayService, metav1.CreateOptions{})
-// 	// if err != nil {
-// 	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create rayservice: %v", err)})
-// 	// 	return
-// 	// }
+	// 返回创建成功的 Rayservice 对象
+	c.JSON(http.StatusOK, createdRayService)
+}
 
-// 	// 返回创建成功的 Rayservice 对象
-// 	// c.JSON(http.StatusOK, createdRayService)
-// 	c.JSON(http.StatusOK, "createdRayService")
-// }
+// buildRayServiceObject 用于构建 Rayservice 对象
+func (rh *ResourceHandler) buildRayServiceObject(namespace string, data map[string]interface{}) *rayv1.RayService {
+	// 根据你的数据结构构建 Rayservice 对象，以下是一个示例，你需要根据实际情况修改
+	replicas := int32(1)
+	gpu := float64(1)
+	rayService := &rayv1.RayService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      data["name"].(string),
+			Namespace: namespace,
+			Labels: func() map[string]string {
+				parts := strings.Split(config.GetInferenceServiceLabel(), "=")
+				if len(parts) != 2 {
+					return nil
+				}
+				return map[string]string{parts[0]: parts[1]}
+			}(),
+		},
+		Spec: rayv1.RayServiceSpec{
+			RayClusterSpec: rayv1.RayClusterSpec{
+				HeadGroupSpec: rayv1.HeadGroupSpec{
+					ServiceType:    v1.ServiceTypeNodePort,
+					RayStartParams: map[string]string{"dashboard-host": "0.0.0.0", "num-gpus": "0"},
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Image: data["image"].(string),
+									Name:  "ray-head",
+									Ports: []v1.ContainerPort{
+										{
+											ContainerPort: 6379,
+											Name:          "gcs-server",
+											Protocol:      v1.ProtocolTCP,
+										},
+										{
+											ContainerPort: 8265,
+											Name:          "dashboard",
+											Protocol:      v1.ProtocolTCP,
+										},
+										{
+											ContainerPort: 10001,
+											Name:          "client",
+											Protocol:      v1.ProtocolTCP,
+										},
+										{
+											ContainerPort: 8000,
+											Name:          "serve",
+											Protocol:      v1.ProtocolTCP,
+										},
+									},
+									Resources: v1.ResourceRequirements{
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("2000m"),
+											v1.ResourceMemory: resource.MustParse("8Gi"),
+										},
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("1000m"),
+											v1.ResourceMemory: resource.MustParse("4Gi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				RayVersion: "2.7.1",
+				WorkerGroupSpecs: []rayv1.WorkerGroupSpec{
+					{
+						GroupName:      "worker",
+						MaxReplicas:    &replicas,
+						MinReplicas:    &replicas,
+						RayStartParams: map[string]string{},
+						Replicas:       &replicas,
+						Template: v1.PodTemplateSpec{
+							Spec: v1.PodSpec{
+								NodeSelector: map[string]string{"nvidia.com/gpu": "present"},
+								Containers: []v1.Container{
+									{
+										Image: data["image"].(string),
+										Env: []v1.EnvVar{
+											{
+												Name:  "BASE_MODEL_DIR",
+												Value: data["llmPath"].(string),
+											},
+											{
+												Name:  "CHECKPOINT_DIR",
+												Value: data["checkpointPath"].(string),
+											},
+										},
+										Lifecycle: &v1.Lifecycle{
+											PreStop: &v1.LifecycleHandler{
+												Exec: &v1.ExecAction{
+													Command: []string{"/bin/sh", "-c", "ray stop"},
+												},
+											},
+										},
+										Resources: v1.ResourceRequirements{
+											Limits: v1.ResourceList{
+												v1.ResourceCPU:    resource.MustParse("8000m"),
+												v1.ResourceMemory: resource.MustParse("48Gi"),
+												"nvidia.com/gpu":  resource.MustParse("1"),
+											},
+											Requests: v1.ResourceList{
+												v1.ResourceCPU:    resource.MustParse("1000m"),
+												v1.ResourceMemory: resource.MustParse("48Gi"),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			ServeDeploymentGraphSpec: rayv1.ServeDeploymentGraphSpec{
+				ServeConfigSpecs: []rayv1.ServeConfigSpec{
+					{
+						Name:        "LlamaDeployment",
+						NumReplicas: &replicas,
+						RayActorOptions: rayv1.RayActorOptionSpec{
+							NumGpus: &gpu,
+						},
+					},
+				},
+				ImportPath: "inference.deployment",
+				RuntimeEnv: `working_dir: file:///home/inference/inference.zip`,
+			},
+			ServeService: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   data["name"].(string) + "-service",
+					Labels: map[string]string{"app": "inference"},
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
+						{
+							Name:       "serve",
+							Port:       8000,
+							TargetPort: intstr.FromInt(8000),
+							Protocol:   v1.ProtocolTCP,
+						},
+					},
+					Selector: map[string]string{"ray.io/node-type": "head"},
+				},
+			},
+		},
+		// 其他 Rayservice 对象数据，根据需要添加
+	}
 
-// // buildRayServiceObject 用于构建 Rayservice 对象
-// func (rh *ResourceHandler) buildRayServiceObject(namespace string, data map[string]interface{}) *rayv1.RayService {
-// 	// 根据你的数据结构构建 Rayservice 对象，以下是一个示例，你需要根据实际情况修改
-// 	rayService := &v1.RayService{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name:      data["name"].(string),
-// 			Namespace: namespace,
-// 			// 其他对象元信息，根据需要添加
-// 		},
-// 		Spec: v1.RayServiceSpec{
-// 			// 根据你的 Rayservice 对象规格定义添加字段
-// 		},
-// 		// 其他 Rayservice 对象数据，根据需要添加
-// 	}
-
-// 	return rayService
-// }
+	return rayService
+}
 
 func (rh *ResourceHandler) GetLlmCheckpoint(name string) (corev1beta1.LLMCheckpoint, error) {
 	llmCheckpointGroupVersion := schema.GroupVersionResource{
