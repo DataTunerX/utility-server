@@ -35,8 +35,8 @@ func main() {
 	// inference service routes
 	inferenceService := namespaceGroup.Group("/services")
 	{
-		inferenceService.GET("", handler.NewResourceHandler(kubeClients, rayClients).ListRayServices)
-		inferenceService.POST("")
+		inferenceService.GET("", handler.NewResourceHandler(kubeClients, rayClients).ListRayServicesHandler)
+		// inferenceService.POST("", handler.NewResourceHandler(kubeClients, rayClients).CreateRayServiceHandler)
 	}
 	// inference proxy routes
 	inferenceProxy := namespaceGroup.Group("/services/:serviceName/inference")

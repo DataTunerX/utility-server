@@ -10,8 +10,12 @@ import (
 	"datatunerx-server/pkg/k8s"
 	"datatunerx-server/pkg/ray"
 
+	corev1beta1 "github.com/DataTunerX/meta-server/api/core/v1beta1"
+	// rayv1 "github.com/ray-project/kuberay/ray-operator/apis/ray/v1"
+	"github.com/DataTunerX/utility-server/logging"
 	"github.com/gin-gonic/gin"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -140,7 +144,7 @@ func (rh *ResourceHandler) UpdateResourceHandler(c *gin.Context) {
 }
 
 // ListRayServices lists rayservices objects in the specified namespace with the given label selector
-func (rh *ResourceHandler) ListRayServices(c *gin.Context) {
+func (rh *ResourceHandler) ListRayServicesHandler(c *gin.Context) {
 	namespace := c.Param("namespace")
 	// Specify the label selector
 	labelSelector := config.GetInferenceServiceLabel()
@@ -154,4 +158,99 @@ func (rh *ResourceHandler) ListRayServices(c *gin.Context) {
 
 	// Return the list of rayservices objects
 	c.JSON(http.StatusOK, rayServicesList)
+}
+
+// // CreateRayServiceHandler 创建 Rayservice 对象的路由处理函数
+// func (rh *ResourceHandler) CreateRayServiceHandler(c *gin.Context) {
+// 	namespace := c.Param("namespace")
+
+// 	// 从请求体中获取创建 Rayservice 所需的数据
+// 	var requestBody map[string]interface{}
+// 	if err := c.ShouldBindJSON(&requestBody); err != nil {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Failed to parse request body: %v", err)})
+// 		return
+// 	}
+
+// 	var
+// 	llmCheckpoint, err := rh.GetLlmCheckpoint(requestBody["llmCheckpoint"].(string))
+// 	if llmCheckpoint.Spec.CheckpointImage != nil {
+// 		if llmCheckpoint.Spec.CheckpointImage.Name != nil {
+// 			image := llmCheckpoint.Spec.CheckpointImage.Name
+// 		} else {
+// 			logging.ZLogger.Error("LlmCheckpoint missing CheckpointImage.Name")
+// 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprint("LlmCheckpoint missing CheckpointImage.Name")})
+// 			return
+// 		}
+// 		if llmCheckpoint.Spec.CheckpointImage.LLMPath != "" {
+// 			llmPath := llmCheckpoint.Spec.CheckpointImage.LLMPath
+// 		} else {
+// 			logging.ZLogger.Error("LlmCheckpoint missing CheckpointImage.LLMPath")
+// 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprint("LlmCheckpoint missing CheckpointImage.LLMPath")})
+// 			return
+// 		}
+// 		if llmCheckpoint.Spec.CheckpointImage.CheckPointPath != "" {
+// 			checkpointPath := llmCheckpoint.Spec.CheckpointImage.CheckPointPath
+// 		} else {
+// 			logging.ZLogger.Error("LlmCheckpoint missing CheckpointImage.CheckPointPath")
+// 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprint("LlmCheckpoint missing CheckpointImage.CheckPointPath")})
+// 			return
+// 		}
+// 	} else {
+// 		logging.ZLogger.Error("LlmCheckpoint missing CheckpointImage")
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprint("LlmCheckpoint missing CheckpointImage")})
+// 		return
+// 	}
+
+// 	_ := image + l
+// 	// // 创建 Rayservice 对象
+// 	// rayService := rh.buildRayServiceObject(namespace, requestBody)
+
+// 	// 使用 Rayservice 的 Client 进行创建
+// 	// createdRayService, err := rh.RayClients.Clientset.RayV1().RayServices(namespace).Create(context.TODO(), rayService, metav1.CreateOptions{})
+// 	// if err != nil {
+// 	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create rayservice: %v", err)})
+// 	// 	return
+// 	// }
+
+// 	// 返回创建成功的 Rayservice 对象
+// 	// c.JSON(http.StatusOK, createdRayService)
+// 	c.JSON(http.StatusOK, "createdRayService")
+// }
+
+// // buildRayServiceObject 用于构建 Rayservice 对象
+// func (rh *ResourceHandler) buildRayServiceObject(namespace string, data map[string]interface{}) *rayv1.RayService {
+// 	// 根据你的数据结构构建 Rayservice 对象，以下是一个示例，你需要根据实际情况修改
+// 	rayService := &v1.RayService{
+// 		ObjectMeta: metav1.ObjectMeta{
+// 			Name:      data["name"].(string),
+// 			Namespace: namespace,
+// 			// 其他对象元信息，根据需要添加
+// 		},
+// 		Spec: v1.RayServiceSpec{
+// 			// 根据你的 Rayservice 对象规格定义添加字段
+// 		},
+// 		// 其他 Rayservice 对象数据，根据需要添加
+// 	}
+
+// 	return rayService
+// }
+
+func (rh *ResourceHandler) GetLlmCheckpoint(name string) (corev1beta1.LLMCheckpoint, error) {
+	llmCheckpointGroupVersion := schema.GroupVersionResource{
+		Group:    "core.datatunerx.io",
+		Version:  "v1beta1",
+		Resource: "LLMCheckpoint",
+	}
+	llmCheckpointUnstructured, err := rh.KubeClients.DynamicClient.Resource(llmCheckpointGroupVersion).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		logging.ZLogger.Errorf("Failed to get LLMCheckpoint resource: %v", err)
+		return corev1beta1.LLMCheckpoint{}, err
+	}
+	var llmCheckpoint corev1beta1.LLMCheckpoint
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(llmCheckpointUnstructured.Object, &llmCheckpoint)
+	if err != nil {
+		logging.ZLogger.Errorf("Failed to convert Unstructured to LLMCheckpoint: %v", err)
+		return corev1beta1.LLMCheckpoint{}, err
+	}
+	return llmCheckpoint, nil
 }
