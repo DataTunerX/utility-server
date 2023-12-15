@@ -6,7 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/DataTunerX/utility-server/config"
+	"buildimage/config"
+
 	"github.com/DataTunerX/utility-server/logging"
 	"github.com/dustin/go-humanize"
 	"github.com/minio/minio-go/v7"
