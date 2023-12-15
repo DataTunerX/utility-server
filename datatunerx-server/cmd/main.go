@@ -36,6 +36,12 @@ func main() {
 		inferenceProxy.POST("/chat", handler.InferenceHandler)
 	}
 
+	// finetune metrics routes
+	finetuneMetrics := namespaceGroup.Group("/finetune/metrics")
+	{
+		finetuneMetrics.GET("", handler.NewFinetuneMetricsHandler(kubeClients).GetFinetuneMetrics)
+	}
+
 	// Start HTTP server
 	port := os.Getenv("PORT")
 	if port == "" {
