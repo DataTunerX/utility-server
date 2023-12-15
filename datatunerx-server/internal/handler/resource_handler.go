@@ -177,7 +177,7 @@ func (rh *ResourceHandler) CreateRayServiceHandler(c *gin.Context) {
 	}
 
 	var image, llmPath, checkpointPath string
-	llmCheckpoint, err := rh.GetLlmCheckpoint(requestBody["llmCheckpoint"].(string))
+	llmCheckpoint, err := rh.GetLlmCheckpoint(requestBody["llmCheckpoint"].(string), namespace)
 	if err != nil {
 		logging.ZLogger.Errorf("Failed to get LlmCheckpoint: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get LlmCheckpoint: %v", err)})
@@ -377,13 +377,13 @@ func (rh *ResourceHandler) buildRayServiceObject(namespace string, data map[stri
 	return rayService
 }
 
-func (rh *ResourceHandler) GetLlmCheckpoint(name string) (corev1beta1.LLMCheckpoint, error) {
+func (rh *ResourceHandler) GetLlmCheckpoint(name, namespace string) (corev1beta1.LLMCheckpoint, error) {
 	llmCheckpointGroupVersion := schema.GroupVersionResource{
 		Group:    "core.datatunerx.io",
 		Version:  "v1beta1",
-		Resource: "LLMCheckpoint",
+		Resource: "llmcheckpoints",
 	}
-	llmCheckpointUnstructured, err := rh.KubeClients.DynamicClient.Resource(llmCheckpointGroupVersion).Get(context.TODO(), name, metav1.GetOptions{})
+	llmCheckpointUnstructured, err := rh.KubeClients.DynamicClient.Resource(llmCheckpointGroupVersion).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		logging.ZLogger.Errorf("Failed to get LLMCheckpoint resource: %v", err)
 		return corev1beta1.LLMCheckpoint{}, err
