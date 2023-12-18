@@ -1,11 +1,11 @@
 import re
 import os
+import time
 from transformers import LlamaForCausalLM, LlamaTokenizer, GenerationConfig, pipeline
 from peft import PeftModel
 from ray import serve
+from .model import ChatCompletionRequest, ChatCompletionResponse
 
-# origin_model_dir = "/data/llms/llama2-7b"
-# checkpoint_dir = "/ray_results/TorchTrainer_73434_00000_0_2023-11-22_23-26-10/result"
 
 origin_model_dir = os.getenv("BASE_MODEL_DIR")
 checkpoint_dir = os.getenv("CHECKPOINT_DIR")
@@ -31,7 +31,7 @@ class LlamaModel:
     def generate(self, input, temperature: float = 0.1, top_p: float = 0.1, max_tokens: int = 10000, generation_kwargs={}):
         prompt = generate_prompt(input)
         inputs = self.tokenizer(prompt, return_tensors="pt")
-        input_ids = inputs["input_ids"].cuda()  # 将输入移到 GPU 上
+        prompt_tokens = inputs["input_ids"].cuda().shape[1]
         config = GenerationConfig(
             do_sample=True,
             temperature=temperature,
@@ -48,7 +48,10 @@ class LlamaModel:
             device=0,
             framework="pt",
         )
+        start_time = time.time()
         generated_text = pipe(prompt)[0]["generated_text"]
+        end_time = time.time()
+        inference_time = end_time - start_time
         # 使用正则表达式提取大模型的输出
         match = re.search(r'\[/INST\]\n(.+)$', generated_text, re.DOTALL)
         if match:
@@ -56,17 +59,27 @@ class LlamaModel:
             output = model_output
         else:
             output = ""
-        return {"output": output}
+        completion_tokens = self.tokenizer(output, return_tensors="pt")
+        choices = [{"index": 0, "message": {"role": "assistant", "content": output}, "logprobs": None, "finish_reason": "stop"}]
+        usage = {
+            "completion_tokens": str(completion_tokens), 
+            "prompt_tokens": str(prompt_tokens), 
+            "total_tokens": str(int(completion_tokens)+ int(prompt_tokens)), 
+            "elasped_time": str(round(inference_time, 2)), 
+            "token_per_sec": str(round((int(completion_tokens)+ int(prompt_tokens))/inference_time, 2))
+        }
+        resp = ChatCompletionResponse("id", choices, 0, "model", "system_fingerprint", usage)
+        return resp.to_dict()
 
 
-@serve.deployment(route_prefix="/inference", ray_actor_options={"num_gpus": 1})
+@serve.deployment(route_prefix="/chat/completions", ray_actor_options={"num_gpus": 1})
 class LlamaDeployment:
     def __init__(self):
         self.model = LlamaModel()
 
     async def __call__(self, request):
         body = await request.json()
-        input_data = body.get("input")
+        input_data = body.get("messages").get("content")
         return self.model.generate(input_data)
     
 deployment = LlamaDeployment.bind()
