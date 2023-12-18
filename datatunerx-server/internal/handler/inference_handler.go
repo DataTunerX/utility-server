@@ -140,10 +140,10 @@ type InferenceBodyMessage struct {
 }
 
 type InferenceUsage struct {
-	PromptTokens     int    `json:"prompt_tokens"`
-	CompletionTokens int    `json:"completion_tokens"`
-	TotalTokens      int    `json:"total_tokens"`
-	ElapsedTIme      int    `json:"elasped_time"`
+	PromptTokens     string `json:"prompt_tokens"`
+	CompletionTokens string `json:"completion_tokens"`
+	TotalTokens      string `json:"total_tokens"`
+	ElapsedTIme      string `json:"elasped_time"`
 	TokenPerSec      string `json:"token_per_sec"`
 }
 
@@ -165,7 +165,7 @@ type InferenceResponse struct {
 
 type InferenceProcessedResponse struct {
 	Output      string `json:"output"`
-	TokenLength int    `json:"tokenLength"`
-	ElapsedTime int    `json:"elapsedTime"`
+	TokenLength string `json:"tokenLength"`
+	ElapsedTime string `json:"elapsedTime"`
 	TokenPerSec string `json:"tokenPerSec"`
 }
