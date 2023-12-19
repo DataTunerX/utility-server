@@ -152,7 +152,7 @@ class ChatCompletionResponse:
     def to_dict(self):
         return {
             "id": self.id,
-            "choices": [choice.to_dict() for choice in self.choices],
+            "choices": self.choices,
             "created": self.created,
             "model": self.model,
             "system_fingerprint": self.system_fingerprint,
