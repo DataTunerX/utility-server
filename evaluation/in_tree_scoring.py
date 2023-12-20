@@ -46,7 +46,7 @@ for index, q in enumerate(questions, start=1):
             response.raise_for_status()
             end_time = time.time()
 
-            predictions.append(response.json()["choices"][0]["messages"]["content"])
+            predictions.append(response.json()["choices"][0]["message"]["content"])
 
             # 打印请求时间和进度
             print(f"Question {index}/{total_questions} | Request Time: {end_time - start_time:.2f} seconds", flush=True)
