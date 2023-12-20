@@ -363,7 +363,7 @@ func (rh *ResourceHandler) buildRayServiceObject(namespace string, data map[stri
 					Ports: []v1.ServicePort{
 						{
 							Name:       "serve",
-							Port:       8000,
+							Port:       80,
 							TargetPort: intstr.FromInt(8000),
 							Protocol:   v1.ProtocolTCP,
 						},
