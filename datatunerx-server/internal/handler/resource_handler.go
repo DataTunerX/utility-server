@@ -305,6 +305,7 @@ func (rh *ResourceHandler) buildRayServiceObject(namespace string, data map[stri
 								Containers: []v1.Container{
 									{
 										Image: data["image"].(string),
+										Name:  "ray-worker",
 										Env: []v1.EnvVar{
 											{
 												Name:  "BASE_MODEL_DIR",
