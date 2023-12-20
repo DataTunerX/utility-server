@@ -40,7 +40,7 @@ for index, q in enumerate(questions, start=1):
             start_time = time.time()
             response = requests.post(
                 inference_service,
-                data=json.dumps({"messages": {"content": q}}),
+                data=json.dumps({"messages": [{"content": q}]}),
                 headers={"content-type": "application/json"}
             )
             response.raise_for_status()

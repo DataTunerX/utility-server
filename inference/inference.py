@@ -238,7 +238,7 @@ class LlamaDeployment:
 
     async def __call__(self, request):
         body = await request.json()
-        input_data = body.get("messages").get("content")
+        input_data = body.get("messages")[0].get("content")
         return self.model.generate(input_data)
     
 deployment = LlamaDeployment.bind()
