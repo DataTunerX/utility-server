@@ -22,7 +22,7 @@ WORKDIR /app
 # Copy the executable from the builder stage
 COPY --from=builder /app/datatunerx-server .
 
-# Make patch-k8s-server executable
+# Make datatunerx-server executable
 RUN chmod +x datatunerx-server
 
 # Expose the application port
