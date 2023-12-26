@@ -242,6 +242,9 @@ func (rh *ResourceHandler) buildRayServiceObject(namespace string, data map[stri
 				}
 				return map[string]string{parts[0]: parts[1]}
 			}(),
+			Annotations: map[string]string{
+				"core.datatunerx.io/llmCheckpoint": data["llmCheckpoint"].(string),
+			},
 		},
 		Spec: rayv1.RayServiceSpec{
 			RayClusterSpec: rayv1.RayClusterSpec{
