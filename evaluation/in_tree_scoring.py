@@ -7,9 +7,29 @@ import evaluate
 from questions_references_en import questions_references_en_list
 from questions_references_zh import questions_references_zh_list
 
+
 inference_service = os.getenv("INFERENCE_SERVICE")
 evaluation_language = os.getenv("EVALUATION_LANGUAGE")
 complete_notify_url = os.getenv("COMPLETE_NOTIFY_URL")
+rouge1_weight = float(os.getenv("ROUGE1_WEIGHT", "0.35"))
+rouge2_weight = float(os.getenv("ROUGE2_WEIGHT", "0.4"))
+rougeL_weight = float(os.getenv("ROUGEL_WEIGHT", "0.15"))
+rougeLsum_weight = float(os.getenv("ROUGELSUM_WEIGHT", "0.1"))
+rouge_weight = float(os.getenv("ROUGE_WEIGE", "0.75"))
+bleu_weight = float(os.getenv("BLEU_WEIGHT", "0.25"))
+
+def get_weights():
+    """Gets the weights from the environment variables."""
+
+    rouge_weights = [rouge1_weight, rouge2_weight, rougeL_weight, rougeLsum_weight]
+    rouge_weights_sum = sum(rouge_weights)
+    rouge_weights = [round(weight / rouge_weights_sum, 2) for weight in rouge_weights]
+
+    weights = [rouge_weight, bleu_weight]
+    weights_sum = sum(weights)
+    weights = [round(weight / weights_sum, 2) for weight in weights]
+
+    return tuple(rouge_weights+weights)
 
 if evaluation_language == "all":
     sample_size = 50
@@ -30,19 +50,23 @@ predictions = []
 
 max_retries = 3
 retry_interval = 1
+timeout = 60
 
 total_questions = len(questions)
 
 for index, q in enumerate(questions, start=1):
     retries = 0
+    print(f"Processing {index} questions", flush=True)
     while retries < max_retries:
         try:
             start_time = time.time()
             response = requests.post(
                 inference_service,
                 data=json.dumps({"messages": [{"content": q}]}),
-                headers={"content-type": "application/json"}
+                headers={"content-type": "application/json"},
+                timeout=timeout
             )
+            print(f"Request finished, response: {response.status_code}", flush=True)
             response.raise_for_status()
             end_time = time.time()
 
@@ -59,6 +83,7 @@ for index, q in enumerate(questions, start=1):
                 time.sleep(retry_interval)
             else:
                 print(f"Max retries reached. Skipping question: {q}", flush=True)
+                predictions.append("")
 
 references = [sample['references'] for sample in samples]
 
@@ -72,10 +97,7 @@ bleu = evaluate.load("module/bleu")
 bleu_result = bleu.compute(predictions=predictions, references=references)
 print(f"BLEU metrics evaluation finished: {bleu_result}", flush=True)
 
-rouge1_weight=0.35
-rouge2_weight=0.4
-rougeL_weight=0.15
-rougeLsum_weight=0.1
+rouge1_weight, rouge2_weight, rougeL_weight, rougeLsum_weight, rouge_weight, bleu_weight = get_weights()
 
 rouge_score = (rouge1_weight*rouge_result['rouge1']*100 + \
               rouge2_weight*rouge_result['rouge2']*100 + \
@@ -83,9 +105,6 @@ rouge_score = (rouge1_weight*rouge_result['rouge1']*100 + \
               rougeLsum_weight*rouge_result['rougeLsum']*100)
 
 bleu_score = bleu_result['bleu']*100
-
-rouge_weight = 0.75
-bleu_weight = 0.25
 
 score = round((rouge_weight*rouge_score + bleu_weight*bleu_score), 2)
 
