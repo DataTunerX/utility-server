@@ -11,6 +11,11 @@ func init() {
 	config.SetDefault("level", "debug")
 	config.BindEnv("inferenceServiceLabel", "INFERENCE_SERVICE_LABEL")
 	config.SetDefault("inferenceServiceLabel", "serviceType=inferenceService")
+	config.BindEnv("s3ServiceEndpoint", "S3_SERVICE_ENDPOINT")
+	config.BindEnv("s3ServiceAccessKey", "S3_SERVICE_ACCESSKEY")
+	config.BindEnv("s3ServiceSecretKey", "S3_SERVICE_SECRETKEY")
+	config.BindEnv("s3ServiceUseSSL", "S3_SERVICE_USESSL")
+	config.SetDefault("s3ServiceUseSSL", false)
 }
 
 func GetLevel() string {
@@ -19,4 +24,20 @@ func GetLevel() string {
 
 func GetInferenceServiceLabel() string {
 	return config.GetString("inferenceServiceLabel")
+}
+
+func GetS3ServiceEndpoint() string {
+	return config.GetString("s3ServiceEndpoint")
+}
+
+func GetS3ServiceAccessKey() string {
+	return config.GetString("s3ServiceAccessKey")
+}
+
+func GetS3ServiceSecretKey() string {
+	return config.GetString("s3ServiceSecretKey")
+}
+
+func GetS3ServiceUseSSL() bool {
+	return config.GetBool("s3ServiceUseSSL")
 }

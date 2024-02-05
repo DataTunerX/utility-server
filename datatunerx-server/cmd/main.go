@@ -4,9 +4,10 @@ import (
 	"os"
 
 	"datatunerx-server/config"
-	"datatunerx-server/internal/handler"
+	"datatunerx-server/internalp/handler"
 	"datatunerx-server/pkg/k8s"
 	"datatunerx-server/pkg/ray"
+	"datatunerx-server/pkg/s3"
 
 	"github.com/DataTunerX/utility-server/logging"
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,11 @@ func main() {
 	rayClients, err := ray.InitRayClient()
 	if err != nil {
 		logging.ZLogger.Errorf("Error initializing ray client: %v", err)
+	}
+	// Initialize S3 client
+	s3Client, err := s3.NewS3Client(config.GetS3ServiceEndpoint(), config.GetS3ServiceAccessKey(), config.GetS3ServiceSecretKey(), config.GetS3ServiceUseSSL())
+	if err != nil {
+		logging.ZLogger.Errorf("Error initializing s3 client: %v", err)
 	}
 	// Initialize Gin Engine
 	router := gin.Default()
@@ -48,6 +54,12 @@ func main() {
 	finetuneMetrics := namespaceGroup.Group("/finetune/metrics")
 	{
 		finetuneMetrics.GET("", handler.NewFinetuneMetricsHandler(kubeClients).GetFinetuneMetrics)
+	}
+
+	// File upload route
+	fileUpload := apiGroup.Group("/upload")
+	{
+		fileUpload.POST("", handler.NewUploadHandler(s3Client).UploadFile)
 	}
 
 	// Start HTTP server
