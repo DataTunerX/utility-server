@@ -73,30 +73,33 @@ func (uh *UploadHandler) UploadFile(c *gin.Context) {
 
 	// Clone the file
 	file := originalFile
-	defer file.Close()
+	// defer file.Close()
 
 	// Set up the S3 bucket and object name
 	bucketName := "datatunerx"
 	objectName := "uploads/" + header.Filename // Use original filename
 
 	// Check if file already exists in S3
-	currentHash, err := uh.compareFileInS3(bucketName, objectName, file)
-	if err != nil {
-		logging.ZLogger.Errorf("Failed to compare file in S3: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to compare file in S3"})
-		return
-	}
+	// currentHash, err := uh.compareFileInS3(bucketName, objectName, file)
+	// if err != nil {
+	// 	logging.ZLogger.Errorf("Failed to compare file in S3: %v", err)
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to compare file in S3"})
+	// 	return
+	// }
 
-	// Set up the context
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// // Reopen the file for uploading
+	// file.Seek(0, io.SeekStart) // Seek to the beginning of the file
 
-	// Set up progress tracking
-	progressCh := make(chan int64)
-	go uh.trackUploadProgress(ctx, progressCh, file)
+	// // Set up the context
+	// ctx, cancel := context.WithCancel(context.Background())
+	// defer cancel()
+
+	// // Set up progress tracking
+	// progressCh := make(chan int64)
+	// go uh.trackUploadProgress(ctx, progressCh, file)
 
 	// Upload the file to S3
-	s3URL, err := uh.uploadToS3WithProgress(bucketName, objectName, currentHash, file, header, progressCh, dataCh)
+	s3URL, err := uh.uploadToS3WithProgress(bucketName, objectName, file, header, dataCh)
 	if err != nil {
 		logging.ZLogger.Errorf("Failed to upload file to S3: %v", err)
 		// // Send an error event through SSE
@@ -200,24 +203,24 @@ func (pr *progressReader) Write(p []byte) (n int, err error) {
 }
 
 // uploadToS3WithProgress uploads a file to S3 and reports progress through SSE
-func (uh *UploadHandler) uploadToS3WithProgress(bucketName, objectName, fileHash string, file io.Reader, header *multipart.FileHeader, progressCh chan<- int64, dataCh chan<- string) (string, error) {
+func (uh *UploadHandler) uploadToS3WithProgress(bucketName, objectName string, file io.Reader, header *multipart.FileHeader, dataCh chan<- string) (string, error) {
 	// Set up the context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Create a custom TeeReader that calls the Progress function
-	teeReader := &progressReaderWithCallback{
-		Reader:   io.TeeReader(file, &progressReader{progressCh: progressCh}),
-		Progress: func(bytesSent int64) { dataCh <- fmt.Sprintf("progress: %d", bytesSent) },
-	}
+	// // Create a pipe to stream file content
+	// reader, _ := io.Pipe()
 
-	// Upload the file to S3 using TeeReader to track progress
+	// // Set up progress tracking
+	// go uh.trackUploadProgress(ctx, progressCh, reader)
+
+	// Upload the file to S3 using the reader end of the pipe
 	_, err := uh.S3Client.Client.PutObject(
 		ctx,
 		bucketName,
 		objectName,
-		teeReader,
-		-1, // Use -1 to automatically detect size
+		file,
+		header.Size, // Specify the size of the file
 		minio.PutObjectOptions{
 			ContentType:        header.Header.Get("Content-Type"),
 			ContentEncoding:    header.Header.Get("Content-Encoding"),
@@ -276,3 +279,17 @@ func (pr *progressReaderWithCallback) Read(p []byte) (n int, err error) {
 // 		}
 // 	}
 // }
+
+// PrintFileContent prints the content of the file
+func PrintFileContent(file io.Reader) {
+	// Read the content of the file
+	content, err := io.ReadAll(file)
+	if err != nil {
+		logging.ZLogger.Errorf("Failed to read file content: %v", err)
+		return
+	}
+
+	// Print the content
+	fmt.Println("File Content:")
+	fmt.Println(string(content))
+}
