@@ -136,7 +136,7 @@ func formatS3URL(s3URL string) (string, error) {
 	encodedPath := path.Join(path.Dir(parsedURL.Path), encodedObjectName)
 
 	// Format the new S3 URL
-	formattedS3URL := fmt.Sprintf("s3://%s?endpoint_override=%s", encodedPath, parsedURL.Host)
+	formattedS3URL := fmt.Sprintf("s3:/%s?endpoint_override=%s", encodedPath, parsedURL.Host)
 	return formattedS3URL, nil
 }
 
